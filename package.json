@@ -1,0 +1,207 @@
+{
+  "name": "on-task",
+  "displayName": "On Task",
+  "version": "0.1.0",
+  "description": "Task management extension with built-in MCP server and SQLite database",
+  "publisher": "on-task",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:onTaskProjects",
+    "onView:onTaskTasks",
+    "onView:onTaskContexts",
+    "onCommand:on-task.createProject",
+    "onCommand:on-task.createTask",
+    "onCommand:on-task.createContext"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "on-task.createProject",
+        "title": "Create Project",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task.editProject",
+        "title": "Edit Project",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task.deleteProject",
+        "title": "Delete Project",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task.cleanupProject",
+        "title": "Cleanup Project",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task.createTask",
+        "title": "Create Task",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task.editTask",
+        "title": "Edit Task",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task.deleteTask",
+        "title": "Delete Task",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task.toggleTaskStatus",
+        "title": "Toggle Task Status",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task.createContext",
+        "title": "Create Context",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task.editContext",
+        "title": "Edit Context",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task.deleteContext",
+        "title": "Delete Context",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task.configureMcp",
+        "title": "Configure MCP",
+        "category": "On Task"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "on-task",
+          "title": "On Task",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "on-task": [
+        {
+          "id": "onTaskProjects",
+          "name": "Projects"
+        },
+        {
+          "id": "onTaskTasks",
+          "name": "Tasks"
+        },
+        {
+          "id": "onTaskContexts",
+          "name": "Contexts"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "on-task.createProject",
+          "when": "view == onTaskProjects",
+          "group": "navigation"
+        },
+        {
+          "command": "on-task.createTask",
+          "when": "view == onTaskTasks",
+          "group": "navigation"
+        },
+        {
+          "command": "on-task.createContext",
+          "when": "view == onTaskContexts",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "on-task.editProject",
+          "when": "view == onTaskProjects",
+          "group": "inline"
+        },
+        {
+          "command": "on-task.deleteProject",
+          "when": "view == onTaskProjects",
+          "group": "inline"
+        },
+        {
+          "command": "on-task.cleanupProject",
+          "when": "view == onTaskProjects",
+          "group": "inline"
+        },
+        {
+          "command": "on-task.editTask",
+          "when": "view == onTaskTasks",
+          "group": "inline"
+        },
+        {
+          "command": "on-task.deleteTask",
+          "when": "view == onTaskTasks",
+          "group": "inline"
+        },
+        {
+          "command": "on-task.toggleTaskStatus",
+          "when": "view == onTaskTasks",
+          "group": "inline"
+        },
+        {
+          "command": "on-task.editContext",
+          "when": "view == onTaskContexts",
+          "group": "inline"
+        },
+        {
+          "command": "on-task.deleteContext",
+          "when": "view == onTaskContexts",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/glob": "^7.2.0",
+    "@types/mocha": "^9.1.1",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.60.0",
+    "@typescript-eslint/eslint-plugin": "^5.30.0",
+    "@typescript-eslint/parser": "^5.30.0",
+    "eslint": "^8.18.0",
+    "glob": "^8.0.3",
+    "mocha": "^10.0.0",
+    "ts-loader": "^9.3.1",
+    "typescript": "^4.7.4",
+    "webpack": "^5.73.0",
+    "webpack-cli": "^4.10.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maiks1986/on-task.git"
+  },
+  "bugs": {
+    "url": "https://github.com/maiks1986/on-task/issues"
+  },
+  "homepage": "https://github.com/maiks1986/on-task#readme"
+}
