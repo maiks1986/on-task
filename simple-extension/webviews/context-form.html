@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context Form</title>
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-editor-background);
+            padding: 20px;
+        }
+        .form-container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--vscode-input-border);
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border-radius: 3px;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .button-group {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .primary-button {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+        }
+        .secondary-button {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+        }
+        .form-title {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2 class="form-title" id="form-title">Create Context</h2>
+        <form id="context-form">
+            <input type="hidden" id="context-id" name="id" value="">
+            
+            <div class="form-group">
+                <label for="context-name">Context Name:</label>
+                <input type="text" id="context-name" name="name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="context-description">Description:</label>
+                <textarea id="context-description" name="description"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="context-task">Associated Task:</label>
+                <select id="context-task" name="task">
+                    <option value="">-- Select Task --</option>
+                    <!-- Tasks will be populated by the extension -->
+                </select>
+            </div>
+            
+            <div class="button-group">
+                <button type="button" class="secondary-button" id="cancel-button">Cancel</button>
+                <button type="submit" class="primary-button" id="save-button">Save</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        (function() {
+            // Get VS Code API
+            const vscode = acquireVsCodeApi();
+            
+            // Get form elements
+            const form = document.getElementById('context-form');
+            const formTitle = document.getElementById('form-title');
+            const idInput = document.getElementById('context-id');
+            const nameInput = document.getElementById('context-name');
+            const descriptionInput = document.getElementById('context-description');
+            const taskSelect = document.getElementById('context-task');
+            const cancelButton = document.getElementById('cancel-button');
+            
+            // Handle messages from extension
+            window.addEventListener('message', event => {
+                const message = event.data;
+                
+                // Handle edit mode
+                if (message.type === 'edit') {
+                    formTitle.textContent = 'Edit Context';
+                    idInput.value = message.context.id;
+                    nameInput.value = message.context.name;
+                    descriptionInput.value = message.context.description || '';
+                    
+                    // Set selected task if available
+                    if (message.context.taskId) {
+                        taskSelect.value = message.context.taskId;
+                    }
+                }
+                
+
+                
+                // Populate tasks dropdown
+                if (message.tasks) {
+                    // Clear existing options except the first one
+                    while (taskSelect.options.length > 1) {
+                        taskSelect.remove(1);
+                    }
+                    
+                    // Add task options
+                    message.tasks.forEach(task => {
+                        const option = document.createElement('option');
+                        option.value = task.id;
+                        option.textContent = task.name;
+                        taskSelect.appendChild(option);
+                    });
+                }
+            });
+            
+            // Handle form submission
+            form.addEventListener('submit', e => {
+                e.preventDefault();
+                
+                const context = {
+                    id: idInput.value,
+                    name: nameInput.value,
+                    description: descriptionInput.value,
+                    taskId: taskSelect.value
+                };
+                
+                // Send data back to extension
+                vscode.postMessage({
+                    type: 'save',
+                    context: context
+                });
+            });
+            
+            // Handle cancel button
+            cancelButton.addEventListener('click', () => {
+                vscode.postMessage({ type: 'cancel' });
+            });
+        })();
+    </script>
+</body>
+</html>

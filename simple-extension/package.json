@@ -1,0 +1,188 @@
+{
+  "name": "on-task-simple",
+  "displayName": "On Task (Simple)",
+  "version": "0.0.1",
+  "description": "Simple task management extension for VS Code and derivatives",
+  "publisher": "on-task",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maiks1986/on-task.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:onTaskProjects",
+    "onView:onTaskTasks",
+    "onView:onTaskContexts",
+    "onCommand:on-task-simple.showWelcomeMessage",
+    "onCommand:on-task-simple.manageMCPServer"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "on-task-simple.showWelcomeMessage",
+        "title": "Show Welcome Message",
+        "category": "On Task"
+      },
+      {
+        "command": "on-task-simple.manageMCPServer",
+        "title": "Manage MCP Server",
+        "category": "On Task",
+        "icon": "$(server)"
+      },
+      {
+        "command": "on-task-simple.createProject",
+        "title": "Create Project",
+        "category": "On Task",
+        "icon": "$(add)"
+      },
+      {
+        "command": "on-task-simple.editProject",
+        "title": "Edit Project",
+        "category": "On Task",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "on-task-simple.deleteProject",
+        "title": "Delete Project",
+        "category": "On Task",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "on-task-simple.createTask",
+        "title": "Create Task",
+        "category": "On Task",
+        "icon": "$(add)"
+      },
+      {
+        "command": "on-task-simple.editTask",
+        "title": "Edit Task",
+        "category": "On Task",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "on-task-simple.deleteTask",
+        "title": "Delete Task",
+        "category": "On Task",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "on-task-simple.toggleTaskStatus",
+        "title": "Toggle Task Status",
+        "category": "On Task",
+        "icon": "$(check)"
+      },
+      {
+        "command": "on-task-simple.createContext",
+        "title": "Create Context",
+        "category": "On Task",
+        "icon": "$(add)"
+      },
+      {
+        "command": "on-task-simple.editContext",
+        "title": "Edit Context",
+        "category": "On Task",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "on-task-simple.deleteContext",
+        "title": "Delete Context",
+        "category": "On Task",
+        "icon": "$(trash)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "on-task",
+          "title": "On Task",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "on-task": [
+        {
+          "id": "onTaskProjects",
+          "name": "Projects",
+          "icon": "$(folder)"
+        },
+        {
+          "id": "onTaskTasks",
+          "name": "Tasks",
+          "icon": "$(checklist)"
+        },
+        {
+          "id": "onTaskContexts",
+          "name": "Contexts",
+          "icon": "$(symbol-namespace)"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "on-task-simple.createProject",
+          "when": "view == onTaskProjects",
+          "group": "navigation"
+        },
+        {
+          "command": "on-task-simple.createTask",
+          "when": "view == onTaskTasks",
+          "group": "navigation"
+        },
+        {
+          "command": "on-task-simple.createContext",
+          "when": "view == onTaskContexts",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "on-task-simple.editProject",
+          "when": "view == onTaskProjects",
+          "group": "inline"
+        },
+        {
+          "command": "on-task-simple.deleteProject",
+          "when": "view == onTaskProjects",
+          "group": "inline"
+        },
+        {
+          "command": "on-task-simple.editTask",
+          "when": "view == onTaskTasks",
+          "group": "inline"
+        },
+        {
+          "command": "on-task-simple.toggleTaskStatus",
+          "when": "view == onTaskTasks",
+          "group": "inline"
+        },
+        {
+          "command": "on-task-simple.deleteTask",
+          "when": "view == onTaskTasks",
+          "group": "inline"
+        },
+        {
+          "command": "on-task-simple.editContext",
+          "when": "view == onTaskContexts",
+          "group": "inline"
+        },
+        {
+          "command": "on-task-simple.deleteContext",
+          "when": "view == onTaskContexts",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "package": "vsce package"
+  }
+}
