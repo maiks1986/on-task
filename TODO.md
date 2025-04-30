@@ -2,36 +2,36 @@
 
 ## Project Setup
 
-- [ ] Initialize VS Code extension project
-- [ ] Set up TypeScript configuration
-- [ ] Create basic folder structure
-- [ ] Set up build and packaging configuration
-- [ ] Create extension manifest (package.json)
+- [x] Initialize VS Code extension project
+- [x] Set up TypeScript configuration
+- [x] Create basic folder structure
+- [x] Set up build and packaging configuration
+- [x] Create extension manifest (package.json)
 
 ## Graphical Interface
 
-- [ ] Create extension activation entry point
-- [ ] Design and implement sidebar view container
-- [ ] Implement projects view
-  - [ ] Create project list UI component
-  - [ ] Implement project creation dialog
-  - [ ] Implement project editing functionality
-  - [ ] Implement project deletion functionality
-- [ ] Implement tasks view
-  - [ ] Create task list UI component
-  - [ ] Implement task creation dialog
-  - [ ] Implement task editing functionality
-  - [ ] Implement task status toggling (done/pending)
-  - [ ] Implement task deletion functionality
+- [x] Create extension activation entry point
+- [x] Design and implement sidebar view container
+- [x] Implement projects view
+  - [x] Create project list UI component
+  - [x] Implement project creation dialog
+  - [x] Implement project editing functionality
+  - [x] Implement project deletion functionality
+- [x] Implement tasks view
+  - [x] Create task list UI component
+  - [x] Implement task creation dialog
+  - [x] Implement task editing functionality
+  - [x] Implement task status toggling (done/pending)
+  - [x] Implement task deletion functionality
   - [ ] Implement task filtering and sorting
   - [ ] Implement task search functionality
-- [ ] Implement contexts view
-  - [ ] Create context list UI component
-  - [ ] Implement context creation dialog
-  - [ ] Implement context editing functionality
-  - [ ] Implement context deletion functionality
-- [ ] Create status bar items
-  - [ ] MCP server status indicator
+- [x] Implement contexts view
+  - [x] Create context list UI component
+  - [x] Implement context creation dialog
+  - [x] Implement context editing functionality
+  - [x] Implement context deletion functionality
+- [x] Create status bar items
+  - [x] MCP server status indicator
   - [ ] Quick task creation button
 - [ ] Implement keyboard shortcuts
 - [ ] Create webview for detailed task view
@@ -39,51 +39,51 @@
 
 ## Database
 
-- [ ] Set up SQLite database integration
-- [ ] Create database initialization script
-- [ ] Implement database schema
-  - [ ] Create projects table
-  - [ ] Create tasks table
-  - [ ] Create contexts table
-- [ ] Implement database service
-  - [ ] Create connection management
-  - [ ] Implement project CRUD operations
-  - [ ] Implement task CRUD operations
-  - [ ] Implement context CRUD operations
+- [x] Set up SQLite database integration
+- [x] Create database initialization script
+- [x] Implement database schema
+  - [x] Create projects table
+  - [x] Create tasks table
+  - [x] Create contexts table
+- [x] Implement database service
+  - [x] Create connection management
+  - [x] Implement project CRUD operations
+  - [x] Implement task CRUD operations
+  - [x] Implement context CRUD operations
 - [ ] Implement database migration system
-- [ ] Create project cleanup functionality
+- [x] Create project cleanup functionality
 - [ ] Implement data export/import functionality
-- [ ] Add error handling and transaction support
+- [x] Add error handling and transaction support
 
 ## MCP Server
 
-- [ ] Set up MCP server framework
-- [ ] Implement MCP server initialization
-- [ ] Create MCP configuration detection
-- [ ] Implement automatic MCP configuration
-- [ ] Create MCP tools for task management
-  - [ ] Tool to get all tasks
-  - [ ] Tool to get tasks by project
-  - [ ] Tool to get task details
-  - [ ] Tool to create new tasks
-  - [ ] Tool to update tasks
-  - [ ] Tool to mark tasks as done/pending
-  - [ ] Tool to delete tasks
-- [ ] Create MCP tools for context management
-  - [ ] Tool to get all contexts
-  - [ ] Tool to get contexts by task
-  - [ ] Tool to create new contexts
-  - [ ] Tool to update contexts
-  - [ ] Tool to delete contexts
-- [ ] Create MCP tools for project management
-  - [ ] Tool to get all projects
-  - [ ] Tool to get project details
-  - [ ] Tool to create new projects
-  - [ ] Tool to update projects
-  - [ ] Tool to delete projects
-  - [ ] Tool to clean up projects
-- [ ] Implement MCP server status monitoring
-- [ ] Add error handling and logging
+- [x] Set up MCP server framework
+- [x] Implement MCP server initialization
+- [x] Create MCP configuration detection
+- [x] Implement automatic MCP configuration
+- [x] Create MCP tools for task management
+  - [x] Tool to get all tasks
+  - [x] Tool to get tasks by project
+  - [x] Tool to get task details
+  - [x] Tool to create new tasks
+  - [x] Tool to update tasks
+  - [x] Tool to mark tasks as done/pending
+  - [x] Tool to delete tasks
+- [x] Create MCP tools for context management
+  - [x] Tool to get all contexts
+  - [x] Tool to get contexts by task
+  - [x] Tool to create new contexts
+  - [x] Tool to update contexts
+  - [x] Tool to delete contexts
+- [x] Create MCP tools for project management
+  - [x] Tool to get all projects
+  - [x] Tool to get project details
+  - [x] Tool to create new projects
+  - [x] Tool to update projects
+  - [x] Tool to delete projects
+  - [x] Tool to clean up projects
+- [x] Implement MCP server status monitoring
+- [x] Add error handling and logging
 
 ## Testing
 
