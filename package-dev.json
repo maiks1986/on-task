@@ -1,0 +1,69 @@
+{
+  "name": "on-task-dev",
+  "displayName": "On Task (Dev)",
+  "version": "0.1.0",
+  "description": "Task management extension with built-in MCP server and SQLite database",
+  "publisher": "on-task",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:onTaskProjects",
+    "onView:onTaskTasks",
+    "onView:onTaskContexts",
+    "onCommand:on-task.showWelcomeMessage"
+  ],
+  "main": "./out/extension-dev.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "on-task.showWelcomeMessage",
+        "title": "Show Welcome Message",
+        "category": "On Task"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "on-task",
+          "title": "On Task",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "on-task": [
+        {
+          "id": "onTaskProjects",
+          "name": "Projects"
+        },
+        {
+          "id": "onTaskTasks",
+          "name": "Tasks"
+        },
+        {
+          "id": "onTaskContexts",
+          "name": "Contexts"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "16.x",
+    "@types/vscode": "^1.60.0",
+    "@typescript-eslint/eslint-plugin": "^5.30.0",
+    "@typescript-eslint/parser": "^5.30.0",
+    "eslint": "^8.18.0",
+    "typescript": "^4.7.4"
+  }
+}
