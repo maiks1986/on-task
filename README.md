@@ -8,18 +8,18 @@ On Task is a task management extension for Visual Studio Code and compatible VS 
 
 ### Extension GUI
 
-The UI has a list of tasks and a list of contexts for those tasks. It has an add button that opens a little popup window that allows you to add tasks and another one to add contexts.
+The UI has a list of projects, tasks, and contexts. Tasks are associated with projects, and contexts are associated with tasks. The extension provides intuitive forms for creating and editing each item type.
 
 ### Extension Features List
 
 - Create, update, clean up, and delete projects
-- Create, update, and delete tasks
-- Create, update, and delete contexts
+- Create, update, and delete tasks with project associations
+- Create, update, and delete contexts linked to specific tasks
 - Mark tasks as done or pending
-- Detects if MCP server is running
-- Detects if MCP server is added to mcp_config.json
-  - Get code for mcp_config.json and a button to add it automatically
-- Project cleanup is a function that will clean up the database
+- MCP server integration for programmatic access
+  - Manage MCP server registration in the Windsurf MCP configuration
+  - One-click installation of MCP server configuration
+- Project cleanup functionality to maintain the database
 - Task prioritization and sorting options
 - Task filtering by status, context, or custom criteria
 - Task search functionality
@@ -62,11 +62,40 @@ If the extension is not available in your editor's marketplace, you can also ins
 
 ## MCP Integration
 
-The MCP server is written in TypeScript and is used to manage tasks and contexts. It handles operations like marking tasks as done or pending. The MCP server is built using the [ModelContextProtocol](https://github.com/modelcontextprotocol/typescript-sdk). When a task is marked as done, it will automatically return the next task.
+The On Task extension includes an MCP (Model Context Protocol) server that allows programmatic access to the extension's functionality. The MCP server provides tools for managing projects, tasks, and contexts through a standardized protocol.
+
+### MCP Server Tools
+
+#### Project Tools
+
+- `project.add`: Add a new project
+- `project.edit`: Edit an existing project
+
+#### Task Tools
+
+- `task.add`: Add a new task
+- `task.edit`: Edit an existing task
+- `task.get`: Get a task by ID
+- `task.done`: Mark a task as done
+
+#### Context Tools
+
+- `context.add`: Add a new context
+- `context.edit`: Edit an existing context
+- `context.get`: Get a context by ID
 
 ### MCP Configuration
 
-The extension will automatically detect if the MCP server is added to your `mcp_config.json`. If not, it will provide you with the necessary configuration code and a button to add it automatically.
+The extension provides a dedicated MCP server management panel that allows you to:
+
+1. Check if the MCP server is registered in your Windsurf MCP configuration
+2. Install the MCP server configuration with a single click
+
+To access the MCP server management panel:
+
+1. Open the command palette (Ctrl+Shift+P)
+2. Run the command "On Task: Manage MCP Server"
+3. Click the "Install MCP Server" button to register the server in your MCP configuration
 
 ## Database Schema
 
@@ -93,7 +122,6 @@ The database is implemented using SQLite and consists of the following tables:
 |task_description|TEXT|Description of the task|
 |task_status|TEXT|Status of the task (e.g., "pending", "done")|
 |priority|INTEGER|Task priority (optional)|
-|due_date|DATETIME|When the task is due (optional)|
 |created_at|DATETIME|When the task was created|
 |updated_at|DATETIME|When the task was last updated|
 
