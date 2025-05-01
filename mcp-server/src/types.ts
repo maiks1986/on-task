@@ -38,6 +38,22 @@ export interface ProjectEditParams {
   description?: string;
 }
 
+export interface ProjectGetParams {
+  id: string;
+}
+
+export interface ProjectGetAllParams {
+  // Optional filter parameters could be added here
+}
+
+export interface ProjectDeleteParams {
+  id: string;
+}
+
+export interface ProjectCleanupParams {
+  id: string;
+}
+
 export interface TaskAddParams {
   name: string;
   description?: string;
@@ -54,6 +70,18 @@ export interface TaskEditParams {
 }
 
 export interface TaskGetParams {
+  id: string;
+}
+
+export interface TaskGetAllParams {
+  // Optional filter parameters could be added here
+}
+
+export interface TaskGetByProjectParams {
+  projectId: string;
+}
+
+export interface TaskDeleteParams {
   id: string;
 }
 
@@ -78,17 +106,46 @@ export interface ContextGetParams {
   id: string;
 }
 
+export interface ContextGetAllParams {
+  // Optional filter parameters could be added here
+}
+
+export interface ContextGetByTaskParams {
+  taskId: string;
+}
+
+export interface ContextDeleteParams {
+  id: string;
+}
+
 // Tool results
 export interface ProjectResult {
   project: Project;
+}
+
+export interface ProjectsResult {
+  projects: Project[];
 }
 
 export interface TaskResult {
   task: Task;
 }
 
+export interface TasksResult {
+  tasks: Task[];
+}
+
 export interface ContextResult {
   context: Context;
+}
+
+export interface ContextsResult {
+  contexts: Context[];
+}
+
+export interface DeleteResult {
+  success: boolean;
+  message: string;
 }
 
 // MCP request and response
@@ -98,5 +155,5 @@ export interface MCPRequest {
 }
 
 export interface MCPResponse {
-  result: ProjectResult | TaskResult | ContextResult;
+  result: ProjectResult | ProjectsResult | TaskResult | TasksResult | ContextResult | ContextsResult | DeleteResult;
 }
