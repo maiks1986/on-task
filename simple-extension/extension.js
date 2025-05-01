@@ -1,8 +1,10 @@
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const mcpServerUtils = require('./mcp-server-utilis');
-const database = require('../shared/database');
+const sqlite3 = require('sqlite3').verbose();
+const { v4: uuidv4 } = require('uuid');
 
 /**
  * Simple implementation of the On Task extension
@@ -139,66 +141,192 @@ function activate(context) {
   const tasksProvider = new OnTaskDataProvider(taskItems, 'task');
   const contextsProvider = new OnTaskDataProvider(contextItems, 'context');
   
-  // Function to fetch data from MCP server
+  // Database setup
+  let db = null;
+  
+  // Initialize the database connection
+  function initializeDatabase() {
+    try {
+      // Use the same database path as the MCP server
+      // Get the user's home directory or AppData directory
+      const homeDir = process.env.APPDATA || process.env.HOME || os.homedir();
+      const dbDir = path.join(homeDir, '.on-task');
+      const dbFile = path.join(dbDir, 'on-task.db');
+      
+      console.log(`Using shared database at: ${dbFile}`);
+      
+      // Ensure the directory exists
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+        console.log(`Created database directory at ${dbDir}`);
+      }
+      
+      // Create database connection
+      db = new sqlite3.Database(dbFile, (err) => {
+        if (err) {
+          console.error('Error connecting to database:', err);
+          vscode.window.showErrorMessage(`Failed to connect to database: ${err.message}`);
+        } else {
+          console.log('Connected to the On Task database');
+          // Initialize schema if needed
+          initializeSchema();
+          // Initial data fetch after connection is established
+          fetchDataFromMCP();
+        }
+      });
+    } catch (error) {
+      console.error('Error initializing database:', error);
+      vscode.window.showErrorMessage(`Failed to initialize database: ${error.message}`);
+    }
+  }
+  
+  // Initialize the database schema if needed
+  function initializeSchema() {
+    console.log('Initializing database schema...');
+    
+    // Create projects table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `, (err) => {
+      if (err) {
+        console.error('Error creating projects table:', err);
+      } else {
+        console.log('Projects table initialized');
+      }
+    });
+    
+    // Create tasks table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT DEFAULT 'todo',
+        priority INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+      )
+    `, (err) => {
+      if (err) {
+        console.error('Error creating tasks table:', err);
+      } else {
+        console.log('Tasks table initialized');
+      }
+    });
+    
+    // Create contexts table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS contexts (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        content TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE
+      )
+    `, (err) => {
+      if (err) {
+        console.error('Error creating contexts table:', err);
+      } else {
+        console.log('Contexts table initialized');
+      }
+    });
+  }
+  
+  // Function to fetch data from shared database
   async function fetchDataFromMCP() {
     try {
-      // Fetch projects using MCP tool
-      const projectsResult = await vscode.commands.executeCommand('ot_get_all_projects');
-      // Clear existing items
-      projectsProvider._items = [];
-      
-      // Add new items if projects were returned
-      if (projectsResult && projectsResult.projects) {
-        projectsResult.projects.forEach(project => {
-          projectsProvider.addItem(new OnTaskItem(
-            project.id,
-            project.name,
-            project.description || '',
-            'project'
-          ));
-        });
+      if (!db) {
+        console.error('Database not initialized');
+        return;
       }
       
-      // Refresh the view
-      projectsProvider.refresh();
-      
-      // Fetch tasks using MCP tool
-      const tasksResult = await vscode.commands.executeCommand('ot_get_all_tasks');
-      // Clear existing items
-      tasksProvider._items = [];
-      
-      // Add new items if tasks were returned
-      if (tasksResult && tasksResult.tasks) {
-        tasksResult.tasks.forEach(task => {
-          tasksProvider.addItem(new OnTaskItem(
-            task.id,
-          task.name,
-          task.status || 'Pending',
-          'task',
-          task.status === 'Done' ? 'Done' : ''
-        ));
+      // Fetch projects from database
+      db.all('SELECT * FROM projects ORDER BY created_at DESC', [], (err, projects) => {
+        if (err) {
+          console.error('Error fetching projects:', err);
+          return;
+        }
+        
+        // Clear existing items
+        projectsProvider._items = [];
+        
+        // Add new items if projects were returned
+        if (projects && projects.length > 0) {
+          projects.forEach(project => {
+            projectsProvider.addItem(new OnTaskItem(
+              project.id,
+              project.name,
+              project.description || '',
+              'project'
+            ));
+          });
+        }
+        
+        // Refresh the view
+        projectsProvider.refresh();
       });
-      }
       
-      // Refresh the view
-      tasksProvider.refresh();
+      // Fetch tasks from database
+      db.all('SELECT * FROM tasks ORDER BY created_at DESC', [], (err, tasks) => {
+        if (err) {
+          console.error('Error fetching tasks:', err);
+          return;
+        }
+        
+        // Clear existing items
+        tasksProvider._items = [];
+        
+        // Add new items if tasks were returned
+        if (tasks && tasks.length > 0) {
+          tasks.forEach(task => {
+            tasksProvider.addItem(new OnTaskItem(
+              task.id,
+              task.name,
+              task.status || 'Pending',
+              'task',
+              task.status === 'Done' ? 'Done' : ''
+            ));
+          });
+        }
+        
+        // Refresh the view
+        tasksProvider.refresh();
+      });
       
-      // Fetch contexts using MCP tool
-      const contextsResult = await vscode.commands.executeCommand('ot_get_all_contexts');
-      // Clear existing items
-      contextsProvider._items = [];
-      
-      // Add new items if contexts were returned
-      if (contextsResult && contextsResult.contexts) {
-        contextsResult.contexts.forEach(context => {
-          contextsProvider.addItem(new OnTaskItem(
-            context.id,
-            context.name,
-            context.description || '',
-            'context'
-          ));
-        });
-      }
+      // Fetch contexts from database
+      db.all('SELECT * FROM contexts ORDER BY created_at DESC', [], (err, contexts) => {
+        if (err) {
+          console.error('Error fetching contexts:', err);
+          return;
+        }
+        
+        // Clear existing items
+        contextsProvider._items = [];
+        
+        // Add new items if contexts were returned
+        if (contexts && contexts.length > 0) {
+          contexts.forEach(context => {
+            contextsProvider.addItem(new OnTaskItem(
+              context.id,
+              context.name,
+              context.description || '',
+              'context'
+            ));
+          });
+        }
+        
+        // Refresh the view
+        contextsProvider.refresh();
+      });
       
       // Refresh the view
       contextsProvider.refresh();
@@ -211,10 +339,23 @@ function activate(context) {
   const pollingInterval = setInterval(fetchDataFromMCP, 3000);
   
   // Make sure to clear the interval when the extension is deactivated
-  context.subscriptions.push({ dispose: () => clearInterval(pollingInterval) });
+  context.subscriptions.push({ 
+    dispose: () => {
+      clearInterval(pollingInterval);
+      if (db) {
+        db.close((err) => {
+          if (err) {
+            console.error('Error closing database:', err);
+          } else {
+            console.log('Database connection closed');
+          }
+        });
+      }
+    } 
+  });
   
-  // Initial data fetch
-  fetchDataFromMCP();
+  // Initialize database and fetch data
+  initializeDatabase();
 
   // Register tree data providers
   vscode.window.registerTreeDataProvider('onTaskProjects', projectsProvider);
@@ -257,20 +398,39 @@ function activate(context) {
     panel.webview.onDidReceiveMessage(async message => {
       if (message.type === 'save') {
         try {
-          // Create new project directly using the database
+          // Create new project directly using the shared database
           const project = message.project;
-          const result = await vscode.commands.executeCommand('ot_add_project', {
-            name: project.name,
-            description: project.description || ''
-          });
+          const id = uuidv4();
+          const now = new Date().toISOString();
           
-          if (result && result.project) {
-            vscode.window.showInformationMessage(`Project '${result.project.name}' created.`);
-            // Trigger a refresh immediately
-            fetchDataFromMCP();
-          } else {
-            vscode.window.showErrorMessage('Failed to create project.');
-          }
+          db.run(
+            'INSERT INTO projects (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+            [id, project.name, project.description || '', now, now],
+            function(err) {
+              if (err) {
+                console.error('Error creating project:', err);
+                vscode.window.showErrorMessage(`Error creating project: ${err.message}`);
+                return;
+              }
+              
+              const result = {
+                project: {
+                  id,
+                  name: project.name,
+                  description: project.description || '',
+                  created_at: now,
+                  updated_at: now
+                }
+              };
+          
+              if (result && result.project) {
+                vscode.window.showInformationMessage(`Project '${result.project.name}' created.`);
+                // Trigger a refresh immediately
+                fetchDataFromMCP();
+              } else {
+                vscode.window.showErrorMessage('Failed to create project.');
+              }
+            });
         } catch (error) {
           console.error('Error creating project:', error);
           vscode.window.showErrorMessage(`Error creating project: ${error.message || 'Unknown error'}`);
@@ -292,21 +452,37 @@ function activate(context) {
     panel.webview.onDidReceiveMessage(async message => {
       if (message.type === 'save') {
         try {
-          // Update project using MCP tool
+          // Update project using shared database
           const project = message.project;
-          const result = await vscode.commands.executeCommand('ot_edit_project', {
-            id: item.id,
-            name: project.name,
-            description: project.description || ''
-          });
+          const now = new Date().toISOString();
           
-          if (result && result.project) {
-            vscode.window.showInformationMessage(`Project updated to '${result.project.name}'.`);
-            // Trigger a refresh immediately
-            fetchDataFromMCP();
-          } else {
-            vscode.window.showErrorMessage('Failed to update project.');
-          }
+          db.run(
+            'UPDATE projects SET name = ?, description = ?, updated_at = ? WHERE id = ?',
+            [project.name, project.description || '', now, item.id],
+            function(err) {
+              if (err) {
+                console.error('Error updating project:', err);
+                vscode.window.showErrorMessage(`Error updating project: ${err.message}`);
+                return;
+              }
+              
+              const result = {
+                project: {
+                  id: item.id,
+                  name: project.name,
+                  description: project.description || '',
+                  updated_at: now
+                }
+              };
+          
+              if (result && result.project) {
+                vscode.window.showInformationMessage(`Project updated to '${result.project.name}'.`);
+                // Trigger a refresh immediately
+                fetchDataFromMCP();
+              } else {
+                vscode.window.showErrorMessage('Failed to update project.');
+              }
+            });
         } catch (error) {
           console.error('Error updating project:', error);
           vscode.window.showErrorMessage(`Error updating project: ${error.message || 'Unknown error'}`);
@@ -329,18 +505,24 @@ function activate(context) {
     
     if (confirmation === 'Delete') {
       try {
-        // Delete project using MCP tool
-        const result = await vscode.commands.executeCommand('ot_delete_project', {
-          id: item.id
-        });
+        // Delete project using shared database
+        db.run('DELETE FROM projects WHERE id = ?', [item.id], function(err) {
+          if (err) {
+            console.error('Error deleting project:', err);
+            vscode.window.showErrorMessage(`Error deleting project: ${err.message}`);
+            return;
+          }
+          
+          const result = { success: true };
         
-        if (result && result.success) {
-          vscode.window.showInformationMessage(`Project '${item.label}' deleted.`);
-          // Trigger a refresh immediately
-          fetchDataFromMCP();
-        } else {
-          vscode.window.showErrorMessage('Failed to delete project.');
-        }
+          if (result && result.success) {
+            vscode.window.showInformationMessage(`Project '${item.label}' deleted.`);
+            // Trigger a refresh immediately
+            fetchDataFromMCP();
+          } else {
+            vscode.window.showErrorMessage('Failed to delete project.');
+          }
+        });
       } catch (error) {
         console.error('Error deleting project:', error);
         vscode.window.showErrorMessage(`Error deleting project: ${error.message || 'Unknown error'}`);
@@ -357,22 +539,42 @@ function activate(context) {
     panel.webview.onDidReceiveMessage(async message => {
       if (message.type === 'save') {
         try {
-          // Create new task using MCP tool
+          // Create new task using shared database
           const task = message.task;
-          const result = await vscode.commands.executeCommand('ot_add_task', {
-            name: task.name,
-            description: task.description || '',
-            priority: task.priority || 'Medium',
-            projectId: task.projectId
-          });
+          const id = uuidv4();
+          const now = new Date().toISOString();
           
-          if (result && result.task) {
-            vscode.window.showInformationMessage(`Task '${result.task.name}' created.`);
-            // Trigger a refresh immediately
-            fetchDataFromMCP();
-          } else {
-            vscode.window.showErrorMessage('Failed to create task.');
-          }
+          db.run(
+            'INSERT INTO tasks (id, name, description, status, priority, project_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, task.name, task.description || '', 'Pending', task.priority || 'Medium', task.projectId, now, now],
+            function(err) {
+              if (err) {
+                console.error('Error creating task:', err);
+                vscode.window.showErrorMessage(`Error creating task: ${err.message}`);
+                return;
+              }
+              
+              const result = {
+                task: {
+                  id,
+                  name: task.name,
+                  description: task.description || '',
+                  status: 'Pending',
+                  priority: task.priority || 'Medium',
+                  project_id: task.projectId,
+                  created_at: now,
+                  updated_at: now
+                }
+              };
+          
+              if (result && result.task) {
+                vscode.window.showInformationMessage(`Task '${result.task.name}' created.`);
+                // Trigger a refresh immediately
+                fetchDataFromMCP();
+              } else {
+                vscode.window.showErrorMessage('Failed to create task.');
+              }
+            });
         } catch (error) {
           console.error('Error creating task:', error);
           vscode.window.showErrorMessage(`Error creating task: ${error.message || 'Unknown error'}`);
@@ -407,23 +609,39 @@ function activate(context) {
     panel.webview.onDidReceiveMessage(async message => {
       if (message.type === 'save') {
         try {
-          // Update task using MCP tool
+          // Update task using shared database
           const task = message.task;
-          const result = await vscode.commands.executeCommand('ot_edit_task', {
-            id: task.id,
-            name: task.name,
-            description: task.description || '',
-            priority: task.priority || 'Medium',
-            status: task.status || 'Pending'
-          });
+          const now = new Date().toISOString();
           
-          if (result && result.task) {
-            vscode.window.showInformationMessage(`Task '${result.task.name}' updated.`);
-            // Trigger a refresh immediately
-            fetchDataFromMCP();
-          } else {
-            vscode.window.showErrorMessage('Failed to update task.');
-          }
+          db.run(
+            'UPDATE tasks SET name = ?, description = ?, priority = ?, status = ?, updated_at = ? WHERE id = ?',
+            [task.name, task.description || '', task.priority || 'Medium', task.status || 'Pending', now, task.id],
+            function(err) {
+              if (err) {
+                console.error('Error updating task:', err);
+                vscode.window.showErrorMessage(`Error updating task: ${err.message}`);
+                return;
+              }
+              
+              const result = {
+                task: {
+                  id: task.id,
+                  name: task.name,
+                  description: task.description || '',
+                  priority: task.priority || 'Medium',
+                  status: task.status || 'Pending',
+                  updated_at: now
+                }
+              };
+          
+              if (result && result.task) {
+                vscode.window.showInformationMessage(`Task '${result.task.name}' updated.`);
+                // Trigger a refresh immediately
+                fetchDataFromMCP();
+              } else {
+                vscode.window.showErrorMessage('Failed to update task.');
+              }
+            });
         } catch (error) {
           console.error('Error updating task:', error);
           vscode.window.showErrorMessage(`Error updating task: ${error.message || 'Unknown error'}`);
@@ -440,18 +658,29 @@ function activate(context) {
     if (!item) return;
     
     try {
-      // Mark task as done using MCP tool
-      const result = await vscode.commands.executeCommand('ot_mark_task_done', {
-        id: item.id
-      });
+      // Mark task as done using shared database
+      const now = new Date().toISOString();
       
-      if (result && result.success) {
-        vscode.window.showInformationMessage(`Task '${item.label}' marked as Done.`);
-        // Trigger a refresh immediately
-        fetchDataFromMCP();
-      } else {
-        vscode.window.showErrorMessage('Failed to update task status.');
-      }
+      db.run(
+        'UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?',
+        ['Done', now, item.id],
+        function(err) {
+          if (err) {
+            console.error('Error marking task as done:', err);
+            vscode.window.showErrorMessage(`Error marking task as done: ${err.message}`);
+            return;
+          }
+          
+          const result = { success: true };
+      
+          if (result && result.success) {
+            vscode.window.showInformationMessage(`Task '${item.label}' marked as Done.`);
+            // Trigger a refresh immediately
+            fetchDataFromMCP();
+          } else {
+            vscode.window.showErrorMessage('Failed to update task status.');
+          }
+        });
     } catch (error) {
       console.error('Error updating task status:', error);
       vscode.window.showErrorMessage(`Error updating task status: ${error.message || 'Unknown error'}`);
@@ -469,18 +698,24 @@ function activate(context) {
     
     if (confirmation === 'Delete') {
       try {
-        // Delete task using MCP tool
-        const result = await vscode.commands.executeCommand('ot_delete_task', {
-          id: item.id
-        });
+        // Delete task using shared database
+        db.run('DELETE FROM tasks WHERE id = ?', [item.id], function(err) {
+          if (err) {
+            console.error('Error deleting task:', err);
+            vscode.window.showErrorMessage(`Error deleting task: ${err.message}`);
+            return;
+          }
+          
+          const result = { success: true };
         
-        if (result && result.success) {
-          vscode.window.showInformationMessage(`Task '${item.label}' deleted.`);
-          // Trigger a refresh immediately
-          fetchDataFromMCP();
-        } else {
-          vscode.window.showErrorMessage('Failed to delete task.');
-        }
+          if (result && result.success) {
+            vscode.window.showInformationMessage(`Task '${item.label}' deleted.`);
+            // Trigger a refresh immediately
+            fetchDataFromMCP();
+          } else {
+            vscode.window.showErrorMessage('Failed to delete task.');
+          }
+        });
       } catch (error) {
         console.error('Error deleting task:', error);
         vscode.window.showErrorMessage(`Error deleting task: ${error.message || 'Unknown error'}`);

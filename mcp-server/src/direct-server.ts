@@ -9,13 +9,38 @@
 import express from 'express';
 import { json } from 'body-parser';
 import { allTools } from './tools';
-import './database'; // Initialize database
 
 // Create a simple server configuration
 const serverConfig = {
   name: "on-task-mcp-server",
   version: "0.1.0"
 };
+
+// Set a reasonable timeout for operations
+const OPERATION_TIMEOUT = 5000; // 5 seconds
+
+// Flag to track if database is initialized
+let isDatabaseInitialized = false;
+
+/**
+ * Initialize the database on demand
+ * This allows the MCP server to start quickly and only initialize the database when needed
+ */
+async function initializeDatabaseIfNeeded() {
+  if (!isDatabaseInitialized) {
+    try {
+      // Dynamic import to avoid blocking server startup
+      await import('./database');
+      isDatabaseInitialized = true;
+      console.log('Database initialized successfully');
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize database:', error);
+      return false;
+    }
+  }
+  return true;
+}
 
 /**
  * MCP Server class
@@ -25,10 +50,22 @@ class MCPServer {
   private config: typeof serverConfig;
   private transports: any[] = [];
   public tools: any[] = [];
+  private isInitialized: boolean = false;
 
   constructor(config: typeof serverConfig) {
     this.config = config;
     console.log(`Creating MCP server: ${config.name} v${config.version}`);
+  }
+  
+  /**
+   * Initialize the server
+   * This is called when the server is ready to receive requests
+   */
+  initialize() {
+    if (!this.isInitialized) {
+      console.log('MCP server initialized and ready to receive requests');
+      this.isInitialized = true;
+    }
   }
 
   /**
@@ -63,44 +100,71 @@ class MCPServer {
 class StdioTransport {
   constructor() {
     console.log('Created stdio transport');
+    
+    // Set up the stdin data handler
     process.stdin.on('data', this.handleStdinData.bind(this));
+    
+    // Set up error handlers
+    process.on('uncaughtException', (err: Error) => {
+      console.error('Uncaught exception:', err);
+      this.sendErrorResponse(null, -32000, 'Internal error', String(err));
+    });
+    
+    // Log that we're ready
+    console.log('Stdio transport ready to receive requests');
   }
 
   private async handleStdinData(data: Buffer) {
+    let input: any;
+    let id: string | number | null = null;
+    
     try {
-      const input = JSON.parse(data.toString());
-      console.log('Received request:', JSON.stringify(input, null, 2));
+      // Parse the input data
+      input = JSON.parse(data.toString());
+      id = input.id;
+      
+      console.log(`Received request ID ${id}:`, input.method);
       
       // Check if it's a valid JSON-RPC 2.0 request
       if (input.jsonrpc !== '2.0' || !input.method) {
-        const errorResponse = {
-          jsonrpc: '2.0',
-          id: input.id,
-          error: {
-            code: -32600,
-            message: 'Invalid Request',
-            data: 'The JSON sent is not a valid Request object.'
-          }
-        };
-        process.stdout.write(JSON.stringify(errorResponse) + '\n');
+        this.sendErrorResponse(id, -32600, 'Invalid Request', 'The JSON sent is not a valid Request object.');
         return;
       }
       
-      const result = await this.processRequest(input);
+      // Process the request with a timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Operation timed out')), OPERATION_TIMEOUT);
+      });
+      
+      const result = await Promise.race([
+        this.processRequest(input),
+        timeoutPromise
+      ]);
+      
+      // Send the response
       process.stdout.write(JSON.stringify(result) + '\n');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error processing stdin data:', error);
-      const errorResponse = {
-        jsonrpc: '2.0',
-        id: null,
-        error: {
-          code: -32700,
-          message: 'Parse error',
-          data: String(error)
-        }
-      };
-      process.stdout.write(JSON.stringify(errorResponse) + '\n');
+      
+      if (error instanceof Error && error.message === 'Operation timed out') {
+        this.sendErrorResponse(id, -32000, 'Request timeout', 'The operation took too long to complete');
+      } else {
+        this.sendErrorResponse(id, -32700, 'Parse error', String(error));
+      }
     }
+  }
+  
+  private sendErrorResponse(id: string | number | null, code: number, message: string, data: string) {
+    const errorResponse = {
+      jsonrpc: '2.0',
+      id,
+      error: {
+        code,
+        message,
+        data
+      }
+    };
+    process.stdout.write(JSON.stringify(errorResponse) + '\n');
   }
 
   private async processRequest(request: any) {
@@ -122,7 +186,33 @@ class StdioTransport {
         }
       };
     } else if (method === 'tools/call') {
+      // Ensure we're handling the parameters correctly according to MCP spec
+      if (!params || typeof params !== 'object') {
+        return {
+          jsonrpc: '2.0',
+          id,
+          error: {
+            code: -32602,
+            message: 'Invalid params',
+            data: 'Parameters must be an object with name and arguments properties'
+          }
+        };
+      }
+      
       const { name, arguments: args } = params;
+      
+      if (!name) {
+        return {
+          jsonrpc: '2.0',
+          id,
+          error: {
+            code: -32602,
+            message: 'Invalid params',
+            data: 'Tool name is required'
+          }
+        };
+      }
+      
       const tool = server.findTool(name);
       
       if (!tool) {
@@ -138,7 +228,12 @@ class StdioTransport {
       }
       
       try {
-        const result = await tool.handler(args);
+        // Initialize database if needed before calling tool
+        await initializeDatabaseIfNeeded();
+        
+        // Call the tool handler with the arguments
+        console.log(`Calling tool ${name} with arguments:`, args);
+        const result = await tool.handler(args || {});
         
         // If result already has content array, use it, otherwise wrap it
         const content = result.content || [{ type: 'text', text: JSON.stringify(result) }];
@@ -152,6 +247,7 @@ class StdioTransport {
           }
         };
       } catch (error) {
+        console.error(`Error calling tool ${name}:`, error);
         return {
           jsonrpc: '2.0',
           id,
@@ -227,7 +323,33 @@ class HttpTransport {
           }
         });
       } else if (method === 'tools/call') {
+        // Ensure we're handling the parameters correctly according to MCP spec
+        if (!params || typeof params !== 'object') {
+          return res.json({
+            jsonrpc: '2.0',
+            id,
+            error: {
+              code: -32602,
+              message: 'Invalid params',
+              data: 'Parameters must be an object with name and arguments properties'
+            }
+          });
+        }
+        
         const { name, arguments: args } = params;
+        
+        if (!name) {
+          return res.json({
+            jsonrpc: '2.0',
+            id,
+            error: {
+              code: -32602,
+              message: 'Invalid params',
+              data: 'Tool name is required'
+            }
+          });
+        }
+        
         const tool = server.findTool(name);
         
         if (!tool) {
@@ -243,7 +365,12 @@ class HttpTransport {
         }
         
         try {
-          const result = await tool.handler(args);
+          // Initialize database if needed before calling tool
+          await initializeDatabaseIfNeeded();
+          
+          // Call the tool handler with the arguments
+          console.log(`Calling tool ${name} with arguments:`, args);
+          const result = await tool.handler(args || {});
           
           // If result already has content array, use it, otherwise wrap it
           const content = result.content || [{ type: 'text', text: JSON.stringify(result) }];
@@ -257,6 +384,7 @@ class HttpTransport {
             }
           });
         } catch (error) {
+          console.error(`Error calling tool ${name}:`, error);
           return res.json({
             jsonrpc: '2.0',
             id,
@@ -278,7 +406,7 @@ class HttpTransport {
           }
         });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error handling request:', error);
       return res.status(500).json({
         jsonrpc: '2.0',
@@ -307,6 +435,7 @@ allTools.forEach(tool => {
 export function startStdioServer() {
   const transport = new StdioTransport();
   server.registerTransport(transport);
+  server.initialize();
   console.log('MCP server started in stdio mode');
 }
 
@@ -319,6 +448,7 @@ export function startHttpServer(port: number = 3000) {
     sessionIdGenerator: () => Math.random().toString(36).substring(2, 15)
   });
   server.registerTransport(transport);
+  server.initialize();
   
   const app = express();
   app.use(json());
@@ -334,9 +464,42 @@ export function startHttpServer(port: number = 3000) {
     next();
   });
   
+  // Add timeout middleware
+  app.use((req, res, next) => {
+    res.setTimeout(OPERATION_TIMEOUT, () => {
+      res.status(408).json({
+        jsonrpc: '2.0',
+        id: req.body?.id || null,
+        error: {
+          code: -32000,
+          message: 'Request timeout',
+          data: 'The operation took too long to complete'
+        }
+      });
+    });
+    next();
+  });
+  
   // Handle MCP requests
   app.post("/", async (req, res) => {
-    await transport.handleRequest(req, res, req.body);
+    try {
+      await Promise.race([
+        transport.handleRequest(req, res, req.body),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Operation timed out')), OPERATION_TIMEOUT))
+      ]);
+    } catch (error: unknown) {
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          id: req.body?.id || null,
+          error: {
+            code: -32000,
+            message: error instanceof Error && error.message === 'Operation timed out' ? 'Request timeout' : 'Internal error',
+            data: String(error)
+          }
+        });
+      }
+    }
   });
   
   // Start the server

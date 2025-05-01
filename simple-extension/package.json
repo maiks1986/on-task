@@ -1,7 +1,7 @@
 {
   "name": "on-task-simple",
   "displayName": "On Task (Simple)",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Simple task management extension for VS Code and derivatives",
   "publisher": "on-task",
   "repository": {

@@ -2,6 +2,26 @@
 
 All notable changes to the "On Task" extension will be documented in this file.
 
+## [0.0.9] - 2025-05-01
+
+### Added
+
+- Direct integration with the shared database for improved data consistency
+- Enhanced error handling for database operations
+- Added detailed documentation for the database integration
+
+### Changed
+
+- Modified the extension to connect directly to the MCP server's SQLite database
+- Updated all CRUD operations to work with the shared database
+- Improved transaction handling for better data integrity
+
+### Fixed
+
+- Fixed data synchronization issues between the simple extension and MCP server
+- Corrected callback structure for all database operations
+- Resolved potential memory leaks in database connection handling
+
 ## [0.0.8] - 2025-05-01
 
 ### Added
