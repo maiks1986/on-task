@@ -221,7 +221,6 @@ On Task uses SQLite for reliable, efficient data storage. The database schema is
 | Column | Type | Description |
 |--------|------|-------------|
 | `context_id` | INTEGER | Primary key, auto-incremented |
-| `project_id` | INTEGER | Foreign key to projects table |
 | `task_id` | INTEGER | Foreign key to tasks table |
 | `context_description` | TEXT | Description of the context |
 | `created_at` | DATETIME | When the context was created |
@@ -233,13 +232,13 @@ On Task uses SQLite for reliable, efficient data storage. The database schema is
 erDiagram
     PROJECTS ||--o{ TASKS : contains
     TASKS ||--o{ CONTEXTS : has
-    PROJECTS ||--o{ CONTEXTS : includes
 ```
 
 - Each project can contain multiple tasks
 - Each task belongs to exactly one project
 - Each context is associated with exactly one task
 - Each task can have multiple contexts
+- Contexts are linked to projects only indirectly through their associated tasks
 
 ## Development
 
