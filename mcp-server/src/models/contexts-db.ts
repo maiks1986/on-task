@@ -14,19 +14,20 @@ export interface Context {
 // Get all contexts
 export async function getAllContexts(): Promise<Context[]> {
   const stmt = db.prepare('SELECT * FROM contexts ORDER BY created_at DESC');
-  return stmt.all();
+  return stmt.all() as Context[];
 }
 
 // Get a context by ID
 export async function getContext(id: string): Promise<Context | null> {
   const stmt = db.prepare('SELECT * FROM contexts WHERE id = ?');
-  return stmt.get(id) || null;
+  const result = stmt.get(id);
+  return result ? result as Context : null;
 }
 
 // Get contexts by task ID
 export async function getContextsByTask(taskId: string): Promise<Context[]> {
   const stmt = db.prepare('SELECT * FROM contexts WHERE task_id = ? ORDER BY created_at DESC');
-  return stmt.all(taskId);
+  return stmt.all(taskId) as Context[];
 }
 
 // Add a new context

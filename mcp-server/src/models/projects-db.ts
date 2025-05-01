@@ -13,13 +13,14 @@ export interface Project {
 // Get all projects
 export async function getAllProjects(): Promise<Project[]> {
   const stmt = db.prepare('SELECT * FROM projects ORDER BY created_at DESC');
-  return stmt.all();
+  return stmt.all() as Project[];
 }
 
 // Get a project by ID
 export async function getProject(id: string): Promise<Project | null> {
   const stmt = db.prepare('SELECT * FROM projects WHERE id = ?');
-  return stmt.get(id) || null;
+  const result = stmt.get(id);
+  return result ? result as Project : null;
 }
 
 // Add a new project

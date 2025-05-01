@@ -1,2 +1,2 @@
-export { server } from './mcp-server';
-export { startStdioServer, startHttpServer } from './transports';
+// Export the server from our direct implementation
+export { server, startStdioServer, startHttpServer } from '../direct-server';

@@ -16,19 +16,20 @@ export interface Task {
 // Get all tasks
 export async function getAllTasks(): Promise<Task[]> {
   const stmt = db.prepare('SELECT * FROM tasks ORDER BY created_at DESC');
-  return stmt.all();
+  return stmt.all() as Task[];
 }
 
 // Get a task by ID
 export async function getTask(id: string): Promise<Task | null> {
   const stmt = db.prepare('SELECT * FROM tasks WHERE id = ?');
-  return stmt.get(id) || null;
+  const result = stmt.get(id);
+  return result ? result as Task : null;
 }
 
 // Get tasks by project ID
 export async function getTasksByProject(projectId: string): Promise<Task[]> {
   const stmt = db.prepare('SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC');
-  return stmt.all(projectId);
+  return stmt.all(projectId) as Task[];
 }
 
 // Add a new task

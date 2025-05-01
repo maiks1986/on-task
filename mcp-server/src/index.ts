@@ -1,5 +1,5 @@
-// Import our modular MCP server implementation
-import { startStdioServer, startHttpServer } from './server';
+// Import our direct MCP server implementation
+import { startStdioServer, startHttpServer } from './direct-server';
 
 // Check if --stdio flag is provided
 const isStdioMode = process.argv.includes('--stdio');
