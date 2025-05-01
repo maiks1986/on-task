@@ -2,6 +2,7 @@ const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const mcpServerUtils = require('./mcp-server-utilis');
+const database = require('../shared/database');
 
 /**
  * Simple implementation of the On Task extension
@@ -126,40 +127,121 @@ function createFormPanel(context, formType, item = null) {
 function activate(context) {
   console.log('On Task (Simple) extension is now active!');
 
-  // Create sample data
-  const projectItems = [
-    new OnTaskItem('project-1', 'Sample Project 1', 'Active', 'project'),
-    new OnTaskItem('project-2', 'Sample Project 2', 'Completed', 'project')
-  ];
+  // Initialize empty data arrays
+  const projectItems = [];
+  const taskItems = [];
+  const contextItems = [];
 
-  const taskItems = [
-    new OnTaskItem('task-1', 'Sample Task 1', 'Pending', 'task'),
-    new OnTaskItem('task-2', 'Sample Task 2', 'Done', 'task', 'Done')
-  ];
-
-  const contextItems = [
-    new OnTaskItem('context-1', 'Sample Context 1', 'Project 1', 'context'),
-    new OnTaskItem('context-2', 'Sample Context 2', 'Project 2', 'context')
-  ];
+  // MCP Server will be accessed via status bar instead of tree view
 
   // Create tree data providers
   const projectsProvider = new OnTaskDataProvider(projectItems, 'project');
   const tasksProvider = new OnTaskDataProvider(taskItems, 'task');
   const contextsProvider = new OnTaskDataProvider(contextItems, 'context');
+  
+  // Function to fetch data from MCP server
+  async function fetchDataFromMCP() {
+    try {
+      // Fetch projects using MCP tool
+      const projectsResult = await vscode.commands.executeCommand('ot_get_all_projects');
+      // Clear existing items
+      projectsProvider._items = [];
+      
+      // Add new items if projects were returned
+      if (projectsResult && projectsResult.projects) {
+        projectsResult.projects.forEach(project => {
+          projectsProvider.addItem(new OnTaskItem(
+            project.id,
+            project.name,
+            project.description || '',
+            'project'
+          ));
+        });
+      }
+      
+      // Refresh the view
+      projectsProvider.refresh();
+      
+      // Fetch tasks using MCP tool
+      const tasksResult = await vscode.commands.executeCommand('ot_get_all_tasks');
+      // Clear existing items
+      tasksProvider._items = [];
+      
+      // Add new items if tasks were returned
+      if (tasksResult && tasksResult.tasks) {
+        tasksResult.tasks.forEach(task => {
+          tasksProvider.addItem(new OnTaskItem(
+            task.id,
+          task.name,
+          task.status || 'Pending',
+          'task',
+          task.status === 'Done' ? 'Done' : ''
+        ));
+      });
+      }
+      
+      // Refresh the view
+      tasksProvider.refresh();
+      
+      // Fetch contexts using MCP tool
+      const contextsResult = await vscode.commands.executeCommand('ot_get_all_contexts');
+      // Clear existing items
+      contextsProvider._items = [];
+      
+      // Add new items if contexts were returned
+      if (contextsResult && contextsResult.contexts) {
+        contextsResult.contexts.forEach(context => {
+          contextsProvider.addItem(new OnTaskItem(
+            context.id,
+            context.name,
+            context.description || '',
+            'context'
+          ));
+        });
+      }
+      
+      // Refresh the view
+      contextsProvider.refresh();
+    } catch (error) {
+      console.error('Error fetching data from MCP server:', error);
+    }
+  }
+  
+  // Set up polling to refresh data every 3 seconds
+  const pollingInterval = setInterval(fetchDataFromMCP, 3000);
+  
+  // Make sure to clear the interval when the extension is deactivated
+  context.subscriptions.push({ dispose: () => clearInterval(pollingInterval) });
+  
+  // Initial data fetch
+  fetchDataFromMCP();
 
   // Register tree data providers
-  context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('onTaskProjects', projectsProvider),
-    vscode.window.registerTreeDataProvider('onTaskTasks', tasksProvider),
-    vscode.window.registerTreeDataProvider('onTaskContexts', contextsProvider)
-  );
+  vscode.window.registerTreeDataProvider('onTaskProjects', projectsProvider);
+  vscode.window.registerTreeDataProvider('onTaskTasks', tasksProvider);
+  vscode.window.registerTreeDataProvider('onTaskContexts', contextsProvider);
+  
+  // Create tree views
+  const projectsTreeView = vscode.window.createTreeView('onTaskProjects', { treeDataProvider: projectsProvider });
+  const tasksTreeView = vscode.window.createTreeView('onTaskTasks', { treeDataProvider: tasksProvider });
+  const contextsTreeView = vscode.window.createTreeView('onTaskContexts', { treeDataProvider: contextsProvider });
 
-  // Create status bar item
+  // Create status bar items
+  // Commented out to reduce UI clutter - can be re-enabled if needed
+  /*
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   statusBarItem.text = "$(checklist) On Task";
-  statusBarItem.tooltip = "On Task extension is active";
-  statusBarItem.command = 'on-task-simple.showWelcomeMessage';
+  statusBarItem.tooltip = "On Task - Simple Task Management";
+  statusBarItem.command = "on-task-simple.showWelcomeMessage";
   statusBarItem.show();
+  */
+  
+  // Create MCP Server status bar item
+  const mcpServerStatusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+  mcpServerStatusBarItem.text = "$(server) On Task MCP Server";
+  mcpServerStatusBarItem.tooltip = "Open MCP Server Panel";
+  mcpServerStatusBarItem.command = "on-task-simple.manageMCPServer";
+  mcpServerStatusBarItem.show();
 
   // Register welcome command
   const welcomeCommand = vscode.commands.registerCommand('on-task-simple.showWelcomeMessage', () => {
@@ -172,18 +254,27 @@ function activate(context) {
     const panel = createFormPanel(context, 'project');
     
     // Handle messages from the webview
-    panel.webview.onDidReceiveMessage(message => {
+    panel.webview.onDidReceiveMessage(async message => {
       if (message.type === 'save') {
-        // Create new project
-        const project = message.project;
-        const id = project.id || `project-${Date.now()}`;
-        projectsProvider.addItem(new OnTaskItem(
-          id, 
-          project.name, 
-          project.status || 'Active', 
-          'project'
-        ));
-        vscode.window.showInformationMessage(`Project '${project.name}' created.`);
+        try {
+          // Create new project directly using the database
+          const project = message.project;
+          const result = await vscode.commands.executeCommand('ot_add_project', {
+            name: project.name,
+            description: project.description || ''
+          });
+          
+          if (result && result.project) {
+            vscode.window.showInformationMessage(`Project '${result.project.name}' created.`);
+            // Trigger a refresh immediately
+            fetchDataFromMCP();
+          } else {
+            vscode.window.showErrorMessage('Failed to create project.');
+          }
+        } catch (error) {
+          console.error('Error creating project:', error);
+          vscode.window.showErrorMessage(`Error creating project: ${error.message || 'Unknown error'}`);
+        }
         panel.dispose();
       } else if (message.type === 'cancel') {
         panel.dispose();
@@ -194,27 +285,32 @@ function activate(context) {
   context.subscriptions.push(vscode.commands.registerCommand('on-task-simple.editProject', async (item) => {
     if (!item) return;
     
-    // Create and show project form panel
+    // Create and show project form panel with existing data
     const panel = createFormPanel(context, 'project', item);
     
-    // Send project data to the webview
-    panel.webview.postMessage({
-      type: 'edit',
-      project: {
-        id: item.id,
-        name: item.label,
-        description: item.description,
-        status: item.description
-      }
-    });
-    
     // Handle messages from the webview
-    panel.webview.onDidReceiveMessage(message => {
+    panel.webview.onDidReceiveMessage(async message => {
       if (message.type === 'save') {
-        // Update project
-        const project = message.project;
-        projectsProvider.updateItem(project.id, project.name, project.status);
-        vscode.window.showInformationMessage(`Project updated to '${project.name}'.`);
+        try {
+          // Update project using MCP tool
+          const project = message.project;
+          const result = await vscode.commands.executeCommand('ot_edit_project', {
+            id: item.id,
+            name: project.name,
+            description: project.description || ''
+          });
+          
+          if (result && result.project) {
+            vscode.window.showInformationMessage(`Project updated to '${result.project.name}'.`);
+            // Trigger a refresh immediately
+            fetchDataFromMCP();
+          } else {
+            vscode.window.showErrorMessage('Failed to update project.');
+          }
+        } catch (error) {
+          console.error('Error updating project:', error);
+          vscode.window.showErrorMessage(`Error updating project: ${error.message || 'Unknown error'}`);
+        }
         panel.dispose();
       } else if (message.type === 'cancel') {
         panel.dispose();
@@ -232,8 +328,23 @@ function activate(context) {
     );
     
     if (confirmation === 'Delete') {
-      projectsProvider.deleteItem(item.id);
-      vscode.window.showInformationMessage(`Project '${item.label}' deleted.`);
+      try {
+        // Delete project using MCP tool
+        const result = await vscode.commands.executeCommand('ot_delete_project', {
+          id: item.id
+        });
+        
+        if (result && result.success) {
+          vscode.window.showInformationMessage(`Project '${item.label}' deleted.`);
+          // Trigger a refresh immediately
+          fetchDataFromMCP();
+        } else {
+          vscode.window.showErrorMessage('Failed to delete project.');
+        }
+      } catch (error) {
+        console.error('Error deleting project:', error);
+        vscode.window.showErrorMessage(`Error deleting project: ${error.message || 'Unknown error'}`);
+      }
     }
   }));
 
@@ -243,19 +354,29 @@ function activate(context) {
     const panel = createFormPanel(context, 'task');
     
     // Handle messages from the webview
-    panel.webview.onDidReceiveMessage(message => {
+    panel.webview.onDidReceiveMessage(async message => {
       if (message.type === 'save') {
-        // Create new task
-        const task = message.task;
-        const id = task.id || `task-${Date.now()}`;
-        tasksProvider.addItem(new OnTaskItem(
-          id, 
-          task.name, 
-          task.status || 'Pending', 
-          'task',
-          task.status === 'Done' ? 'Done' : ''
-        ));
-        vscode.window.showInformationMessage(`Task '${task.name}' created.`);
+        try {
+          // Create new task using MCP tool
+          const task = message.task;
+          const result = await vscode.commands.executeCommand('ot_add_task', {
+            name: task.name,
+            description: task.description || '',
+            priority: task.priority || 'Medium',
+            projectId: task.projectId
+          });
+          
+          if (result && result.task) {
+            vscode.window.showInformationMessage(`Task '${result.task.name}' created.`);
+            // Trigger a refresh immediately
+            fetchDataFromMCP();
+          } else {
+            vscode.window.showErrorMessage('Failed to create task.');
+          }
+        } catch (error) {
+          console.error('Error creating task:', error);
+          vscode.window.showErrorMessage(`Error creating task: ${error.message || 'Unknown error'}`);
+        }
         panel.dispose();
       } else if (message.type === 'cancel') {
         panel.dispose();
@@ -283,12 +404,31 @@ function activate(context) {
     });
     
     // Handle messages from the webview
-    panel.webview.onDidReceiveMessage(message => {
+    panel.webview.onDidReceiveMessage(async message => {
       if (message.type === 'save') {
-        // Update task
-        const task = message.task;
-        tasksProvider.updateItem(task.id, task.name, task.status);
-        vscode.window.showInformationMessage(`Task updated to '${task.name}'.`);
+        try {
+          // Update task using MCP tool
+          const task = message.task;
+          const result = await vscode.commands.executeCommand('ot_edit_task', {
+            id: task.id,
+            name: task.name,
+            description: task.description || '',
+            priority: task.priority || 'Medium',
+            status: task.status || 'Pending'
+          });
+          
+          if (result && result.task) {
+            vscode.window.showInformationMessage(`Task '${result.task.name}' updated.`);
+            // Trigger a refresh immediately
+            fetchDataFromMCP();
+          } else {
+            vscode.window.showErrorMessage('Failed to update task.');
+          }
+        } catch (error) {
+          console.error('Error updating task:', error);
+          vscode.window.showErrorMessage(`Error updating task: ${error.message || 'Unknown error'}`);
+        }
+        // Success message already shown above
         panel.dispose();
       } else if (message.type === 'cancel') {
         panel.dispose();
@@ -296,12 +436,26 @@ function activate(context) {
     });
   }));
 
-  context.subscriptions.push(vscode.commands.registerCommand('on-task-simple.toggleTaskStatus', (item) => {
+  context.subscriptions.push(vscode.commands.registerCommand('on-task-simple.toggleTaskStatus', async (item) => {
     if (!item) return;
     
-    tasksProvider.toggleTaskStatus(item.id);
-    const newStatus = tasksProvider.getItem(item.id).description;
-    vscode.window.showInformationMessage(`Task '${item.label}' marked as ${newStatus}.`);
+    try {
+      // Mark task as done using MCP tool
+      const result = await vscode.commands.executeCommand('ot_mark_task_done', {
+        id: item.id
+      });
+      
+      if (result && result.success) {
+        vscode.window.showInformationMessage(`Task '${item.label}' marked as Done.`);
+        // Trigger a refresh immediately
+        fetchDataFromMCP();
+      } else {
+        vscode.window.showErrorMessage('Failed to update task status.');
+      }
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      vscode.window.showErrorMessage(`Error updating task status: ${error.message || 'Unknown error'}`);
+    }
   }));
 
   context.subscriptions.push(vscode.commands.registerCommand('on-task-simple.deleteTask', async (item) => {
@@ -314,8 +468,23 @@ function activate(context) {
     );
     
     if (confirmation === 'Delete') {
-      tasksProvider.deleteItem(item.id);
-      vscode.window.showInformationMessage(`Task '${item.label}' deleted.`);
+      try {
+        // Delete task using MCP tool
+        const result = await vscode.commands.executeCommand('ot_delete_task', {
+          id: item.id
+        });
+        
+        if (result && result.success) {
+          vscode.window.showInformationMessage(`Task '${item.label}' deleted.`);
+          // Trigger a refresh immediately
+          fetchDataFromMCP();
+        } else {
+          vscode.window.showErrorMessage('Failed to delete task.');
+        }
+      } catch (error) {
+        console.error('Error deleting task:', error);
+        vscode.window.showErrorMessage(`Error deleting task: ${error.message || 'Unknown error'}`);
+      }
     }
   }));
 
@@ -403,7 +572,7 @@ function activate(context) {
   // Register MCP Server management command
   context.subscriptions.push(vscode.commands.registerCommand('on-task-simple.manageMCPServer', () => {
     // Create and show MCP server management panel
-    const panel = createFormPanel(context, 'mcp-panel');
+    const panel = createMCPPanel(context);
     
     // Check MCP server status
     checkMCPServerStatus(panel);
@@ -424,8 +593,13 @@ function activate(context) {
     });
   }));
 
+  // Register MCP Server panel click handler
+  context.subscriptions.push(vscode.commands.registerCommand('on-task-simple.openMCPServerPanel', (item) => {
+    vscode.commands.executeCommand('on-task-simple.manageMCPServer');
+  }));
+
   // Add all disposables to context
-  context.subscriptions.push(statusBarItem, welcomeCommand);
+  context.subscriptions.push(statusBarItem, mcpServerStatusBarItem, welcomeCommand);
 }
 
 /**
@@ -449,6 +623,52 @@ async function checkMCPServerStatus(panel) {
 async function installMCPServer(panel) {
   await mcpServerUtils.installMCPServer();
   checkMCPServerStatus(panel);
+}
+
+/**
+ * Create and show a webview panel for MCP server management
+ * @param {vscode.ExtensionContext} context - The extension context
+ * @returns {vscode.WebviewPanel} The created webview panel
+ */
+function createMCPPanel(context) {
+  // Create panel
+  const panel = vscode.window.createWebviewPanel(
+    'on-task-mcp-panel',
+    'On Task MCP Server Panel',
+    vscode.ViewColumn.One,
+    {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, 'webviews'))]
+    }
+  );
+
+  try {
+    // Get path to HTML file
+    const htmlPath = path.join(context.extensionPath, 'webviews', 'mcp-server-panel.html');
+    
+    // Check if the file exists
+    if (!fs.existsSync(htmlPath)) {
+      console.error(`MCP Server panel HTML file not found at ${htmlPath}`);
+      // Fallback to the original mcp-panel.html if the new file doesn't exist
+      const fallbackPath = path.join(context.extensionPath, 'webviews', 'mcp-panel.html');
+      if (fs.existsSync(fallbackPath)) {
+        console.log(`Using fallback MCP panel HTML file at ${fallbackPath}`);
+        let html = fs.readFileSync(fallbackPath, 'utf8');
+        panel.webview.html = html;
+      } else {
+        panel.webview.html = `<html><body><h1>Error: MCP panel HTML file not found</h1></body></html>`;
+      }
+    } else {
+      // Read and set the HTML content
+      let html = fs.readFileSync(htmlPath, 'utf8');
+      panel.webview.html = html;
+    }
+  } catch (error) {
+    console.error('Error loading MCP panel HTML:', error);
+    panel.webview.html = `<html><body><h1>Error loading MCP panel</h1><p>${error.message}</p></body></html>`;
+  }
+
+  return panel;
 }
 
 function deactivate() {}

@@ -1,7 +1,7 @@
 {
   "name": "on-task-simple",
   "displayName": "On Task (Simple)",
-  "version": "0.0.1",
+  "version": "0.0.8",
   "description": "Simple task management extension for VS Code and derivatives",
   "publisher": "on-task",
   "repository": {
@@ -19,6 +19,7 @@
     "onView:onTaskProjects",
     "onView:onTaskTasks",
     "onView:onTaskContexts",
+    "onView:onTaskMCPServer",
     "onCommand:on-task-simple.showWelcomeMessage",
     "onCommand:on-task-simple.manageMCPServer"
   ],
@@ -184,5 +185,9 @@
   },
   "scripts": {
     "package": "vsce package"
+  },
+  "dependencies": {
+    "sqlite3": "^5.1.7",
+    "uuid": "^11.1.0"
   }
 }

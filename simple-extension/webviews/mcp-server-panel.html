@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>On Task MCP Server Panel</title>
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-editor-background);
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .panel-title {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding-bottom: 10px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section-title {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 3px;
+            margin-bottom: 20px;
+        }
+        .status.installed {
+            background-color: var(--vscode-terminal-ansiGreen);
+            color: var(--vscode-editor-background);
+        }
+        .status.not-installed {
+            background-color: var(--vscode-terminal-ansiRed);
+            color: var(--vscode-editor-background);
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .primary-button {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+        }
+        .secondary-button {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+        }
+        .server-info {
+            background-color: var(--vscode-editor-inactiveSelectionBackground);
+            padding: 15px;
+            border-radius: 3px;
+            margin-top: 15px;
+        }
+        .server-info p {
+            margin: 5px 0;
+        }
+        pre {
+            background-color: var(--vscode-editor-background);
+            padding: 10px;
+            border-radius: 3px;
+            overflow: auto;
+            max-height: 300px;
+            border: 1px solid var(--vscode-panel-border);
+        }
+        .hidden {
+            display: none;
+        }
+        .tools-list {
+            margin-top: 15px;
+        }
+        .tools-list h4 {
+            margin-bottom: 8px;
+            margin-top: 15px;
+        }
+        .tools-list ul {
+            padding-left: 20px;
+        }
+        .tools-list li {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="panel-title">On Task MCP Server Panel</h2>
+        
+        <div class="section">
+            <h3 class="section-title">Server Status</h3>
+            <div id="server-status" class="status not-installed">
+                Checking MCP server status...
+            </div>
+            
+            <div id="server-info" class="server-info hidden">
+                <p><strong>Server Path:</strong> <span id="server-path"></span></p>
+                <p><strong>Version:</strong> <span id="server-version"></span></p>
+                <p><strong>Status:</strong> <span id="server-running-status"></span></p>
+            </div>
+            
+            <div class="button-group">
+                <button id="check-status-button" class="secondary-button">Refresh Status</button>
+            </div>
+        </div>
+        
+        <div id="installation-section" class="section hidden">
+            <h3 class="section-title">Installation</h3>
+            <p>The MCP server is not installed. You can install it automatically or copy the code to install it manually.</p>
+            
+            <div class="button-group">
+                <button id="install-button" class="primary-button">Install MCP Server</button>
+                <button id="copy-code-button" class="secondary-button">Copy Code</button>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h3 class="section-title">Available Tools</h3>
+            <p>The following tools are available in the MCP server:</p>
+            
+            <div class="tools-list">
+                <h4>Server Management Tools</h4>
+                <ul>
+                    <li><strong>server.start</strong>: Start the MCP server</li>
+                    <li><strong>server.stop</strong>: Stop the MCP server</li>
+                    <li><strong>server.restart</strong>: Restart the MCP server</li>
+                    <li><strong>server.status</strong>: Get server status</li>
+                </ul>
+                
+                <h4>Project Tools</h4>
+                <ul>
+                    <li><strong>project.add</strong>: Add a new project</li>
+                    <li><strong>project.edit</strong>: Edit an existing project</li>
+                    <li><strong>project.get</strong>: Get project details</li>
+                    <li><strong>project.list</strong>: List all projects</li>
+                </ul>
+                
+                <h4>Task Tools</h4>
+                <ul>
+                    <li><strong>task.add</strong>: Add a new task</li>
+                    <li><strong>task.edit</strong>: Edit an existing task</li>
+                    <li><strong>task.get</strong>: Get a task by ID</li>
+                    <li><strong>task.done</strong>: Mark a task as done</li>
+                    <li><strong>task.list</strong>: List all tasks</li>
+                </ul>
+                
+                <h4>Context Tools</h4>
+                <ul>
+                    <li><strong>context.add</strong>: Add a new context</li>
+                    <li><strong>context.edit</strong>: Edit an existing context</li>
+                    <li><strong>context.get</strong>: Get a context by ID</li>
+                    <li><strong>context.list</strong>: List all contexts</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        (function() {
+            // Get VS Code API
+            const vscode = acquireVsCodeApi();
+            
+            // Get UI elements
+            const serverStatus = document.getElementById('server-status');
+            const serverInfo = document.getElementById('server-info');
+            const serverPath = document.getElementById('server-path');
+            const serverVersion = document.getElementById('server-version');
+            const serverRunningStatus = document.getElementById('server-running-status');
+            const installationSection = document.getElementById('installation-section');
+            const checkStatusButton = document.getElementById('check-status-button');
+            const installButton = document.getElementById('install-button');
+            const copyCodeButton = document.getElementById('copy-code-button');
+            
+            // Check server status on load
+            checkServerStatus();
+            
+            // Handle messages from extension
+            window.addEventListener('message', event => {
+                const message = event.data;
+                
+                if (message.type === 'serverStatus') {
+                    updateServerStatus(message.status);
+                }
+            });
+            
+            // Button event listeners
+            checkStatusButton.addEventListener('click', () => {
+                checkServerStatus();
+            });
+            
+            installButton.addEventListener('click', () => {
+                vscode.postMessage({
+                    type: 'installServer'
+                });
+            });
+            
+            copyCodeButton.addEventListener('click', () => {
+                vscode.postMessage({
+                    type: 'copyServerCode'
+                });
+            });
+            
+            // Helper functions
+            function checkServerStatus() {
+                vscode.postMessage({
+                    type: 'checkServerStatus'
+                });
+            }
+            
+            function updateServerStatus(status) {
+                if (status.installed) {
+                    // Server is installed
+                    serverStatus.className = 'status installed';
+                    serverStatus.textContent = 'On Task MCP Server is registered';
+                    
+                    // Show server info
+                    serverInfo.classList.remove('hidden');
+                    serverPath.textContent = status.path;
+                    serverVersion.textContent = status.version;
+                    serverRunningStatus.textContent = 'Managed by VS Code';
+                    
+                    // Hide installation section
+                    installationSection.classList.add('hidden');
+                } else {
+                    // Server is not installed
+                    serverStatus.className = 'status not-installed';
+                    serverStatus.textContent = 'On Task MCP Server is not registered';
+                    
+                    // Hide server info
+                    serverInfo.classList.add('hidden');
+                    
+                    // Show installation section
+                    installationSection.classList.remove('hidden');
+                }
+            }
+        })();
+    </script>
+</body>
+</html>

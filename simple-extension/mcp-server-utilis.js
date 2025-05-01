@@ -125,8 +125,8 @@ async function startMCPServer() {
       return true;
     }
     
-    // Start the server
-    mcpServerProcess = spawn('npm', ['start'], { cwd: MCP_SERVER_PATH, shell: true });
+    // Start the server using our new SDK-based implementation with stdio mode
+    mcpServerProcess = spawn('npm', ['run', 'start:stdio'], { cwd: MCP_SERVER_PATH, shell: true, stdio: ['pipe', 'pipe', 'pipe'] });
     
     mcpServerProcess.stdout.on('data', (data) => {
       console.log(`MCP Server stdout: ${data}`);
@@ -183,41 +183,43 @@ async function installMCPServer() {
     // Check if the MCP server is already registered in the config
     const config = await readMCPConfig();
     const isInstalled = config.mcpServers && config.mcpServers.onTask !== undefined;
-    
+
     if (isInstalled) {
       vscode.window.showInformationMessage('On Task MCP Server is already registered in the MCP config.');
       return true;
     }
-    
+
     // Get the MCP server path from the workspace
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
       vscode.window.showErrorMessage('No workspace folder is open.');
       return false;
     }
-    
+
     const workspacePath = workspaceFolders[0].uri.fsPath;
-    const mcpServerPath = path.join(workspacePath, 'mcp-server', 'dist', 'index.js');
+    const mcpServerDir = path.join(workspacePath, 'mcp-server');
     
     // Check if the MCP server exists
-    const mcpServerDir = path.join(workspacePath, 'mcp-server');
     if (!fs.existsSync(mcpServerDir)) {
       vscode.window.showErrorMessage('MCP Server directory not found in workspace. Please build the MCP server first.');
       return false;
     }
-    
+
     // Update the MCP config
     if (!config.mcpServers) {
       config.mcpServers = {};
     }
-    
+
+    // Use our new SDK-based implementation with stdio mode
     config.mcpServers.onTask = {
-      command: 'node',
-      args: [mcpServerPath]
+      command: 'npm',
+      args: ['run', 'start:stdio'],
+      cwd: mcpServerDir,
+      toolNamespace: 'ot'
     };
-    
+
     await writeMCPConfig(config);
-    
+
     vscode.window.showInformationMessage('On Task MCP Server registered successfully in the MCP config.');
     return true;
   } catch (error) {
@@ -260,7 +262,8 @@ function copyMCPServerCode() {
      "dependencies": {
        "express": "^4.18.2",
        "body-parser": "^1.20.2",
-       "uuid": "^9.0.0"
+       "uuid": "^9.0.0",
+       "@modelcontextprotocol/sdk": "^1.10.2"
      },
      "devDependencies": {
        "@types/express": "^4.17.17",
@@ -329,6 +332,22 @@ function copyMCPServerCode() {
      description?: string;
    }
    
+   export interface ProjectGetParams {
+     id: string;
+   }
+   
+   export interface ProjectGetAllParams {
+     // Optional filter parameters could be added here
+   }
+   
+   export interface ProjectDeleteParams {
+     id: string;
+   }
+   
+   export interface ProjectCleanupParams {
+     id: string;
+   }
+   
    export interface TaskAddParams {
      name: string;
      description?: string;
@@ -345,6 +364,18 @@ function copyMCPServerCode() {
    }
    
    export interface TaskGetParams {
+     id: string;
+   }
+   
+   export interface TaskGetAllParams {
+     // Optional filter parameters could be added here
+   }
+   
+   export interface TaskGetByProjectParams {
+     projectId: string;
+   }
+   
+   export interface TaskDeleteParams {
      id: string;
    }
    
@@ -369,17 +400,46 @@ function copyMCPServerCode() {
      id: string;
    }
    
+   export interface ContextGetAllParams {
+     // Optional filter parameters could be added here
+   }
+   
+   export interface ContextGetByTaskParams {
+     taskId: string;
+   }
+   
+   export interface ContextDeleteParams {
+     id: string;
+   }
+   
    // Tool results
    export interface ProjectResult {
      project: Project;
+   }
+   
+   export interface ProjectsResult {
+     projects: Project[];
    }
    
    export interface TaskResult {
      task: Task;
    }
    
+   export interface TasksResult {
+     tasks: Task[];
+   }
+   
    export interface ContextResult {
      context: Context;
+   }
+   
+   export interface ContextsResult {
+     contexts: Context[];
+   }
+   
+   export interface DeleteResult {
+     success: boolean;
+     message: string;
    }
    
    // MCP request and response
@@ -389,17 +449,39 @@ function copyMCPServerCode() {
    }
    
    export interface MCPResponse {
-     result: ProjectResult | TaskResult | ContextResult;
+     result: ProjectResult | ProjectsResult | TaskResult | TasksResult | ContextResult | ContextsResult | DeleteResult;
    }
 
 5. Create src/index.ts:
-   // MCP Server implementation
-   // (See the full code in the GitHub repository)
+   // This file contains the MCP Server implementation with all the tools
+   // Available tools include:
+   // - project.add: Add a new project
+   // - project.edit: Edit an existing project
+   // - project.get: Get a project by ID
+   // - project.getAll: Get all projects
+   // - project.delete: Delete a project
+   // - project.cleanup: Mark a project as completed
+   // - task.add: Add a new task
+   // - task.edit: Edit an existing task
+   // - task.get: Get a task by ID
+   // - task.getAll: Get all tasks
+   // - task.getByProject: Get tasks by project ID
+   // - task.delete: Delete a task
+   // - task.done: Mark a task as done
+   // - context.add: Add a new context
+   // - context.edit: Edit an existing context
+   // - context.get: Get a context by ID
+   // - context.getAll: Get all contexts
+   // - context.getByTask: Get contexts by task ID
+   // - context.delete: Delete a context
 
 6. Install dependencies:
    npm install
 
-7. Build and start the server:
+7. Run the server directly with TypeScript:
+   npx ts-node src/index.ts
+   
+   Or build and run with JavaScript:
    npm run build
    npm start
   `);
