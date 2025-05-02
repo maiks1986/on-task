@@ -16,8 +16,8 @@ const serverConfig = {
   version: "0.1.0"
 };
 
-// Set a reasonable timeout for operations
-const OPERATION_TIMEOUT = 5000; // 5 seconds
+// Set a shorter timeout for operations to ensure quick responses
+const OPERATION_TIMEOUT = 2000; // 2 seconds
 
 // Flag to track if database is initialized
 let isDatabaseInitialized = false;
@@ -96,13 +96,41 @@ class MCPServer {
 
 /**
  * Stdio Transport for CLI usage
+ * 
+ * Implements the MCP protocol stdio transport:
+ * - Receives JSON-RPC messages on stdin
+ * - Writes responses to stdout
+ * - Messages are delimited by newlines
+ * - Logs are written to stderr
  */
 class StdioTransport {
   constructor() {
-    console.log('Created stdio transport');
+    console.error('Created stdio transport');
     
-    // Set up the stdin data handler
-    process.stdin.on('data', this.handleStdinData.bind(this));
+    // Set up the stdin data handler with proper line buffering
+    let buffer = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (chunk: string) => {
+      buffer += chunk;
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep the last incomplete line in the buffer
+      
+      // Process each complete line
+      for (const line of lines) {
+        if (line.trim()) { // Skip empty lines
+          this.handleStdinLine(line);
+        }
+      }
+    });
+    
+    // Handle end of input
+    process.stdin.on('end', () => {
+      if (buffer.trim()) {
+        this.handleStdinLine(buffer);
+      }
+      console.error('Stdin stream ended, shutting down');
+      process.exit(0);
+    });
     
     // Set up error handlers
     process.on('uncaughtException', (err: Error) => {
@@ -110,20 +138,20 @@ class StdioTransport {
       this.sendErrorResponse(null, -32000, 'Internal error', String(err));
     });
     
-    // Log that we're ready
-    console.log('Stdio transport ready to receive requests');
+    // Log that we're ready (to stderr for logging purposes)
+    console.error('Stdio transport ready to receive requests');
   }
 
-  private async handleStdinData(data: Buffer) {
+  private async handleStdinLine(line: string) {
     let input: any;
     let id: string | number | null = null;
     
     try {
       // Parse the input data
-      input = JSON.parse(data.toString());
+      input = JSON.parse(line);
       id = input.id;
       
-      console.log(`Received request ID ${id}:`, input.method);
+      console.error(`Received request ID ${id}:`, input.method);
       
       // Check if it's a valid JSON-RPC 2.0 request
       if (input.jsonrpc !== '2.0' || !input.method) {
@@ -131,7 +159,27 @@ class StdioTransport {
         return;
       }
       
-      // Process the request with a timeout
+      // Special handling for tools/list to avoid timeout issues
+      if (input.method === 'tools/list') {
+        console.error('Fast-path handling for tools/list request');
+        const response = {
+          jsonrpc: '2.0',
+          id: input.id,
+          result: {
+            tools: server.tools.map(tool => ({
+              name: tool.name,
+              description: `Tool for ${tool.name}`,
+              inputSchema: tool.schema
+            })),
+            nextCursor: null
+          }
+        };
+        // Send the response immediately without any processing
+        this.sendResponse(response);
+        return;
+      }
+      
+      // Process other requests with a timeout
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Operation timed out')), OPERATION_TIMEOUT);
       });
@@ -142,7 +190,7 @@ class StdioTransport {
       ]);
       
       // Send the response
-      process.stdout.write(JSON.stringify(result) + '\n');
+      this.sendResponse(result);
     } catch (error: unknown) {
       console.error('Error processing stdin data:', error);
       
@@ -164,7 +212,14 @@ class StdioTransport {
         data
       }
     };
-    process.stdout.write(JSON.stringify(errorResponse) + '\n');
+    this.sendResponse(errorResponse);
+  }
+  
+  private sendResponse(response: any) {
+    // Ensure there are no newlines in the response as per MCP specification
+    const responseStr = JSON.stringify(response);
+    process.stdout.write(responseStr + '\n');
+    console.error('Sent response:', response.id);
   }
 
   private async processRequest(request: any) {
@@ -172,7 +227,10 @@ class StdioTransport {
     
     // Handle different methods
     if (method === 'tools/list') {
-      // Return list of tools
+      // Return list of tools in the exact format required by MCP
+      console.log('Responding to tools/list request');
+      
+      // Response format exactly matching the MCP specification
       return {
         jsonrpc: '2.0',
         id,
@@ -182,7 +240,7 @@ class StdioTransport {
             description: `Tool for ${tool.name}`,
             inputSchema: tool.schema
           })),
-          nextCursor: null // No pagination for now
+          nextCursor: null
         }
       };
     } else if (method === 'tools/call') {
@@ -309,7 +367,10 @@ class HttpTransport {
       
       // Handle different methods
       if (method === 'tools/list') {
-        // Return list of tools
+        // Return list of tools in the exact format required by MCP
+        console.log('Responding to tools/list HTTP request');
+        
+        // Response format exactly matching the MCP specification
         return res.json({
           jsonrpc: '2.0',
           id,
@@ -319,7 +380,7 @@ class HttpTransport {
               description: `Tool for ${tool.name}`,
               inputSchema: tool.schema
             })),
-            nextCursor: null // No pagination for now
+            nextCursor: null
           }
         });
       } else if (method === 'tools/call') {
