@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import * as contextModel from '../models/contexts-db';
 import { createTool } from './tool-factory';
+import { createRichResponse, createSuccessResponse, createErrorResponse } from '../utils/format-response';
 
 // Context tools
 export const contextTools = [
@@ -9,10 +10,20 @@ export const contextTools = [
     description: z.string(),
     taskId: z.string().nullable()
   }, async ({ name, description, taskId }) => {
-    const context = await contextModel.addContext(name, description, taskId);
-    return { 
-      content: [{ type: 'text', text: JSON.stringify({ context }) }]
-    };
+    try {
+      const context = await contextModel.addContext(name, description, taskId);
+      
+      // Example usage for the response
+      const example = `{
+  "name": "Example Context",
+  "description": "This is an example context description",
+  "taskId": "task-id-here"
+}`;
+      
+      return createRichResponse({ context }, 'context', true, example);
+    } catch (error) {
+      return createErrorResponse('Failed to create context', error);
+    }
   }),
 
   createTool('ot_edit_context', {
@@ -21,48 +32,89 @@ export const contextTools = [
     description: z.string().optional(),
     taskId: z.string().nullable().optional()
   }, async ({ id, name, description, taskId }) => {
-    const context = await contextModel.updateContext(
-      id,
-      name || '',
-      description || '',
-      taskId
-    );
-    return { 
-      content: [{ type: 'text', text: JSON.stringify({ context }) }]
-    };
+    try {
+      const context = await contextModel.updateContext(
+        id,
+        name || '',
+        description || '',
+        taskId
+      );
+      
+      // Example usage for the response
+      const example = `{
+  "id": "${id}",
+  "name": "Updated Context Name",
+  "description": "Updated context description",
+  "taskId": "task-id-here"
+}`;
+      
+      return createRichResponse({ context }, 'context', true, example);
+    } catch (error) {
+      return createErrorResponse('Failed to update context', error);
+    }
   }),
 
   createTool('ot_get_context', {
     id: z.string()
   }, async ({ id }) => {
-    const context = await contextModel.getContext(id);
-    return { 
-      content: [{ type: 'text', text: JSON.stringify({ context }) }]
-    };
+    try {
+      const context = await contextModel.getContext(id);
+      
+      // Example usage for the response
+      const example = `{
+  "id": "${id}"
+}`;
+      
+      return createRichResponse({ context }, 'context', true, example);
+    } catch (error) {
+      return createErrorResponse('Failed to get context', error);
+    }
   }),
 
   createTool('ot_get_all_contexts', {}, async () => {
-    const contexts = await contextModel.getAllContexts();
-    return { 
-      content: [{ type: 'text', text: JSON.stringify({ contexts }) }]
-    };
+    try {
+      const contexts = await contextModel.getAllContexts();
+      
+      // Example usage for the response
+      const example = `{}`;
+      
+      return createRichResponse({ contexts }, 'contexts', true, example);
+    } catch (error) {
+      return createErrorResponse('Failed to get contexts', error);
+    }
   }),
 
   createTool('ot_get_contexts_by_task', {
     taskId: z.string()
   }, async ({ taskId }) => {
-    const contexts = await contextModel.getContextsByTask(taskId);
-    return { 
-      content: [{ type: 'text', text: JSON.stringify({ contexts }) }]
-    };
+    try {
+      const contexts = await contextModel.getContextsByTask(taskId);
+      
+      // Example usage for the response
+      const example = `{
+  "taskId": "${taskId}"
+}`;
+      
+      return createRichResponse({ contexts }, 'contexts', true, example);
+    } catch (error) {
+      return createErrorResponse('Failed to get contexts for task', error);
+    }
   }),
 
   createTool('ot_delete_context', {
     id: z.string()
   }, async ({ id }) => {
-    const result = await contextModel.deleteContext(id);
-    return { 
-      content: [{ type: 'text', text: JSON.stringify(result) }]
-    };
+    try {
+      const result = await contextModel.deleteContext(id);
+      
+      // Example usage for the response
+      const example = `{
+  "id": "${id}"
+}`;
+      
+      return createSuccessResponse(`Successfully deleted context with ID: ${id}`, result);
+    } catch (error) {
+      return createErrorResponse('Failed to delete context', error);
+    }
   })
 ];
